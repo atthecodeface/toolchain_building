@@ -4,9 +4,9 @@ TARGET       = riscv32-elf
 
 TARGET_SUFFIX    = -${TARGET}
 DOWNLOAD_DIR     = $(abspath ${DATA_DIR}/download)
-BUILD_DIR        = $(abspath ${DATA_DIR}/build${TARGET_SUFFIX})
 MAKEFILE_TARGETS = $(abspath ${DATA_DIR}/make_targets)
 INSTALL_PATH     = $(abspath ${INSTALL_DIR})
+BUILD_DIR_TS     = $(abspath ${DATA_DIR}/build${TARGET_SUFFIX})
 
 .PHONY: all download configure compile install
 
@@ -18,79 +18,89 @@ configure: configure_binutils configure_gcc
 compile: compile_binutils compile_gcc
 install: install_binutils install_gcc
 
-#a Download targets - not target-specific
-.PHONY: download_gcc download_binutils
-download_gcc:      ${MAKEFILE_TARGETS}/download_gcc_prerequisites
-download_binutils: ${MAKEFILE_TARGETS}/download_untar_binutils
+#a Templates for creating makefile variables
+# mktgt
+# @param $1 stage
+# @param $2 reason
+define mktgt
+MKTGT_$1_$2 := ${MAKEFILE_TARGETS}/$1_$2
+.PHONY: $1_$2
+$1_$2: $$(MKTGT_$1_$2)
+endef
 
-${MAKEFILE_TARGETS}/download_gcc: ${DOWNLOAD_DIR}/gcc-9.1.0.tar.xz
+# mktgt_ts
+# @param $1 stage
+# @param $2 reason
+define mktgt_ts
+MKTGT_TS_$1_$2 := ${MAKEFILE_TARGETS}/$1_$2${TARGET_SUFFIX}
+.PHONY: $1_$2
+$1_$2: $$(MKTGT_TS_$1_$2)
+endef
+
+#a Download targets - not target-specific
+$(foreach s,binutils_tarfile binutils gcc_tarfile gcc_untar gcc,$(eval $(call mktgt,download,$s)))
+${MKTGT_download_gcc_tarfile}: ${DOWNLOAD_DIR}/gcc-9.1.0.tar.xz
 	mkdir -p ${MAKEFILE_TARGETS}
-	touch ${MAKEFILE_TARGETS}/download_gcc
+	touch $@
 
 ${DOWNLOAD_DIR}/gcc-9.1.0.tar.xz:
 	mkdir -p ${DOWNLOAD_DIR}
 	cd ${DOWNLOAD_DIR} && ( [ -f gcc-9.1.0.tar.xz ] || wget https://ftp.gnu.org/gnu/gcc/gcc-9.1.0/gcc-9.1.0.tar.xz )
 
+${MKTGT_download_gcc_untar}: ${MKTGT_download_gcc_tarfile}
+	cd ${DOWNLOAD_DIR} && tar xf gcc-9.1.0.tar.xz
+	touch $@
+
+${MKTGT_download_gcc}: ${MKTGT_download_gcc_untar}
+	cd ${DOWNLOAD_DIR}/gcc-9.1.0 && ./contrib/download_prerequisites
+	touch $@
+
 ${DOWNLOAD_DIR}/binutils-2.32.tar.bz2:
 	mkdir -p ${DOWNLOAD_DIR}
 	cd ${DOWNLOAD_DIR} && ( [ -f binutils-2.32.tar.bz2 ] || wget https://ftp.gnu.org/gnu/binutils/binutils-2.32.tar.bz2 )
 
-${MAKEFILE_TARGETS}/download_binutils: ${DOWNLOAD_DIR}/binutils-2.32.tar.bz2
+${MKTGT_download_binutils_tarfile}: ${DOWNLOAD_DIR}/binutils-2.32.tar.bz2
 	mkdir -p ${MAKEFILE_TARGETS}
-	touch ${MAKEFILE_TARGETS}/download_binutils
+	touch $@
 
-${MAKEFILE_TARGETS}/download_untar_gcc: ${MAKEFILE_TARGETS}/download_gcc
-	cd ${DOWNLOAD_DIR} && tar xf gcc-9.1.0.tar.xz
-	touch ${MAKEFILE_TARGETS}/download_untar_gcc
-
-${MAKEFILE_TARGETS}/download_untar_binutils: ${MAKEFILE_TARGETS}/download_binutils
+${MKTGT_download_binutils}: ${MKTGT_download_binutils_tarfile}
 	cd ${DOWNLOAD_DIR} && tar xf binutils-2.32.tar.bz2
-	touch ${MAKEFILE_TARGETS}/download_untar_binutils
-
-${MAKEFILE_TARGETS}/download_gcc_prerequisites: ${MAKEFILE_TARGETS}/download_untar_gcc
-	cd ${DOWNLOAD_DIR}/gcc-9.1.0 && ./contrib/download_prerequisites
-	touch ${MAKEFILE_TARGETS}/download_gcc_prerequisites
+	touch $@
 
 #a Configure targets - target-specific
-.PHONY: configure_gcc configure_binutils
-configure_gcc:      ${MAKEFILE_TARGETS}/configure_gcc${TARGET_SUFFIX}
-configure_binutils: ${MAKEFILE_TARGETS}/configure_binutils${TARGET_SUFFIX}
+$(foreach s,binutils gcc,$(eval $(call mktgt_ts,configure,$s)))
 
-${MAKEFILE_TARGETS}/configure_gcc${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/download_gcc_prerequisites
-	mkdir -p ${BUILD_DIR}/gcc
-	cd ${BUILD_DIR}/gcc && ${DOWNLOAD_DIR}/gcc-9.1.0/configure --prefix=${INSTALL_PATH} --enable-languages=c --target=${TARGET} --disable-libssp
-	touch ${MAKEFILE_TARGETS}/configure_gcc${TARGET_SUFFIX}
+${MKTGT_TS_configure_binutils}: ${MKTGT_download_binutils}
+	mkdir -p ${BUILD_DIR_TS}/binutils
+	cd ${BUILD_DIR_TS}/binutils && ${DOWNLOAD_DIR}/binutils-2.32/configure --prefix=${INSTALL_PATH} --target=${TARGET} --disable-gold --enable-plugins
+	touch $@
 
-${MAKEFILE_TARGETS}/configure_binutils${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/download_untar_binutils
-	mkdir -p ${BUILD_DIR}/binutils
-	cd ${BUILD_DIR}/binutils && ${DOWNLOAD_DIR}/binutils-2.32/configure --prefix=${INSTALL_PATH} --target=${TARGET} --disable-gold --enable-plugins
-	touch ${MAKEFILE_TARGETS}/configure_binutils${TARGET_SUFFIX}
+${MKTGT_TS_configure_gcc}: ${MKTGT_download_gcc}
+	mkdir -p ${BUILD_DIR_TS}/gcc
+	cd ${BUILD_DIR_TS}/gcc && ${DOWNLOAD_DIR}/gcc-9.1.0/configure --prefix=${INSTALL_PATH} --enable-languages=c --target=${TARGET} --disable-libssp
+	touch $@
 
 #a Compile targets - target-specific
-.PHONY: compile_gcc compile_binutils
-compile_gcc:      ${MAKEFILE_TARGETS}/compile_gcc${TARGET_SUFFIX}
-compile_binutils: ${MAKEFILE_TARGETS}/compile_binutils${TARGET_SUFFIX}
+$(foreach s,binutils gcc,$(eval $(call mktgt_ts,compile,$s)))
 
-${MAKEFILE_TARGETS}/compile_binutils${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/configure_binutils${TARGET_SUFFIX}
-	cd ${BUILD_DIR}/binutils && make all -j10
-	touch ${MAKEFILE_TARGETS}/compile_binutils${TARGET_SUFFIX}
+${MKTGT_TS_compile_binutils}: ${MKTGT_TS_configure_binutils}
+	cd ${BUILD_DIR_TS}/binutils && make all -j10
+	touch $@
 
-${MAKEFILE_TARGETS}/compile_gcc${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/install_binutils${TARGET_SUFFIX} ${MAKEFILE_TARGETS}/configure_gcc${TARGET_SUFFIX}
-	cd ${BUILD_DIR}/gcc && make all
-	touch ${MAKEFILE_TARGETS}/compile_gcc${TARGET_SUFFIX}
+${MKTGT_TS_compile_gcc}: ${MKTGT_TS_install_binutils} ${MKTGT_TS_configure_gcc}
+	cd ${BUILD_DIR_TS}/gcc && make all -j10
+	touch $@
 
 #a Install targets - target-specific
-.PHONY: install_gcc install_binutils
-install_gcc:      ${MAKEFILE_TARGETS}/install_gcc${TARGET_SUFFIX}
-install_binutils: ${MAKEFILE_TARGETS}/install_binutils${TARGET_SUFFIX}
+$(foreach s,binutils gcc,$(eval $(call mktgt_ts,install,$s)))
 
-${MAKEFILE_TARGETS}/install_binutils${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/compile_binutils${TARGET_SUFFIX}
-	cd ${BUILD_DIR}/binutils && make install
-	touch ${MAKEFILE_TARGETS}/install_binutils${TARGET_SUFFIX}
+${MKTGT_TS_install_binutils}: ${MKTGT_TS_compile_binutils}
+	cd ${BUILD_DIR_TS}/binutils && make install
+	touch $@
 
-${MAKEFILE_TARGETS}/install_gcc${TARGET_SUFFIX}: ${MAKEFILE_TARGETS}/compile_gcc${TARGET_SUFFIX}
-	cd ${BUILD_DIR}/gcc && make install
-	touch ${MAKEFILE_TARGETS}/install_gcc${TARGET_SUFFIX}
+${MKTGT_TS_install_gcc}: ${MKTGT_TS_compile_gcc}
+	cd ${BUILD_DIR_TS}/gcc && make install
+	touch $@
 
 #a Cleaning targets
 all_clean:
