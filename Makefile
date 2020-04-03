@@ -1,6 +1,9 @@
 DATA_DIR     = .
 INSTALL_DIR  = .
-TARGET       = riscv32-elf
+TARGET       = riscv32-unknown-elf
+GCC_CONFIG_OPTIONS      = --with-abi=ilp32  --with-arch=rv32imc --enable-languages=c --disable-libssp 
+BINUTILS_CONFIG_OPTIONS = --disable-gold --enable-plugins --disable-werror --disable-gdb --disable-sim --disable-libdecnumber --disable-readline
+
 
 TARGET_SUFFIX    = -${TARGET}
 DOWNLOAD_DIR     = $(abspath ${DATA_DIR}/download)
@@ -72,12 +75,12 @@ $(foreach s,binutils gcc,$(eval $(call mktgt_ts,configure,$s)))
 
 ${MKTGT_TS_configure_binutils}: ${MKTGT_download_binutils}
 	mkdir -p ${BUILD_DIR_TS}/binutils
-	cd ${BUILD_DIR_TS}/binutils && ${DOWNLOAD_DIR}/binutils-2.32/configure --prefix=${INSTALL_PATH} --target=${TARGET} --disable-gold --enable-plugins
+	cd ${BUILD_DIR_TS}/binutils && ${DOWNLOAD_DIR}/binutils-2.32/configure --prefix=${INSTALL_PATH} --target=${TARGET} ${BINUTILS_CONFIG_OPTIONS}
 	touch $@
 
-${MKTGT_TS_configure_gcc}: ${MKTGT_download_gcc}
+${MKTGT_TS_configure_gcc}: ${MKTGT_download_gcc} ${MKTGT_TS_install_binutils} 
 	mkdir -p ${BUILD_DIR_TS}/gcc
-	cd ${BUILD_DIR_TS}/gcc && ${DOWNLOAD_DIR}/gcc-9.1.0/configure --prefix=${INSTALL_PATH} --enable-languages=c --target=${TARGET} --disable-libssp
+	cd ${BUILD_DIR_TS}/gcc && ${DOWNLOAD_DIR}/gcc-9.1.0/configure --prefix=${INSTALL_PATH} --target=${TARGET} ${GCC_CONFIG_OPTIONS}
 	touch $@
 
 #a Compile targets - target-specific
@@ -87,7 +90,7 @@ ${MKTGT_TS_compile_binutils}: ${MKTGT_TS_configure_binutils}
 	cd ${BUILD_DIR_TS}/binutils && make all -j10
 	touch $@
 
-${MKTGT_TS_compile_gcc}: ${MKTGT_TS_install_binutils} ${MKTGT_TS_configure_gcc}
+${MKTGT_TS_compile_gcc}: ${MKTGT_TS_configure_gcc}
 	cd ${BUILD_DIR_TS}/gcc && make all -j10
 	touch $@
 
