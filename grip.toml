@@ -1,4 +1,4 @@
-env = { TOOLS_DATA_DIR="%GRIP_ROOT_PATH%/temp_data" }
+env = { TOOLS_DATA_DIR="@GRIP_ROOT_PATH@/temp_data" }
 doc = """
 The toolchains repository is a make environment for downloading,
 configuring, compiling and installing the GNU toolchain and binutils,
@@ -10,13 +10,13 @@ is complete the network is not required for a built.
 """
 
 [download]
-exec = "make DATA_DIR=%TOOLS_DATA_DIR% INSTALL_DIR=%TOOLS_DIR% download"
+exec = "make DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ download"
 
 [configure-riscv32-unknown-elf]
 requires = [".download"]
-exec = "make TARGET=riscv32-unknown-elf DATA_DIR=%TOOLS_DATA_DIR% INSTALL_DIR=%TOOLS_DIR% configure"
+exec = "make TARGET=riscv32-unknown-elf DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ configure"
 
 [install-riscv32-unknown-elf]
 requires = [".configure-riscv32-unknown-elf"]
-exec = "make TARGET=riscv32-unknown-elf DATA_DIR=%TOOLS_DATA_DIR% INSTALL_DIR=%TOOLS_DIR% install"
+exec = "make TARGET=riscv32-unknown-elf DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ install"
 
