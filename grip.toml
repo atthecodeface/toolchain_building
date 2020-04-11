@@ -1,5 +1,4 @@
-env = { TOOLS_DATA_DIR="@GRIP_ROOT_PATH@/temp_data" }
-doc = """
+doc="""
 The toolchains repository is a make environment for downloading,
 configuring, compiling and installing the GNU toolchain and binutils,
 as cross-compilers.
@@ -7,14 +6,21 @@ as cross-compilers.
 It has three grip stages: download, configure and install. The underlying
 git repo will perform all downloading during the download stage - after that
 is complete the network is not required for a built.
+
+See the Readme.md for more documentation
 """
+
+[env]
+TOOLS_DATA_DIR  = "@GRIP_ROOT_PATH@/temp_data"
+GCC_CONFIG      = "--with-abi=ilp32  --with-arch=rv32imc --enable-languages=c,c++ --disable-libssp"
+BINUTILS_CONFIG = "--disable-gold --enable-plugins --disable-werror --disable-gdb --disable-sim --disable-libdecnumber --disable-readline"
 
 [download]
 exec = "make DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ download"
 
 [configure-riscv32-unknown-elf]
 requires = [".download"]
-exec = "make TARGET=riscv32-unknown-elf DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ configure"
+exec = "make TARGET=riscv32-unknown-elf DATA_DIR=@TOOLS_DATA_DIR@ INSTALL_DIR=@TOOLS_DIR@ GCC_CONFIG_OPTIONS='@GCC_CONFIG@' BINUTILS_CONFIG_OPTIONS='@BINUTILS_CONFIG@' configure"
 
 [install-riscv32-unknown-elf]
 requires = [".configure-riscv32-unknown-elf"]
